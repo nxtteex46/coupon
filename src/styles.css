@@ -1,0 +1,89 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@font-face {
+  font-family: "DB Airy";
+  src: url("./assets/fonts/DB Airy Std v3.2.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "DB Airy";
+  src: url("./assets/fonts/DB Airy Std Med v3.2.ttf") format("truetype");
+  font-weight: 500 600;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "DB Airy";
+  src: url("./assets/fonts/DB Airy Std Bd v3.2.ttf") format("truetype");
+  font-weight: 700 800;
+  font-style: normal;
+}
+
+:root {
+  color: #10212d;
+  background: #f8f2ec;
+  font-family: "IBM Plex Sans Thai", "Noto Sans Thai", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 17px;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  font-family: "IBM Plex Sans Thai", "Noto Sans Thai", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid #10212d;
+  outline-offset: 2px;
+}
+
+button,
+input[type="file"],
+input[type="range"] {
+  font: inherit;
+}
+
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.35);
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border: 2px solid #10212d;
+  border-radius: 999px;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 2px solid #10212d;
+  border-radius: 999px;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
