@@ -119,6 +119,60 @@ const BLACK_TIER_GRADIENT_STOPS = ["#262626", "#494949", "#262626"] as const;
 const scaleToPreview = (value: number) => value * PREVIEW_SCALE;
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
+const imageCache = new Map<string, Promise<HTMLImageElement>>();
+let couponFontsReadyPromise: Promise<void> | null = null;
+
+const loadImage = (src: string, label = "รูปภาพ") => {
+  const cached = imageCache.get(src);
+  if (cached) return cached;
+
+  const promise = new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.decoding = "async";
+    if (!src.startsWith("blob:") && !src.startsWith("data:")) {
+      image.crossOrigin = "anonymous";
+    }
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error(`ไม่สามารถโหลด${label}สำหรับ export ได้`));
+    image.src = src;
+  });
+
+  imageCache.set(src, promise);
+  promise.catch(() => {
+    imageCache.delete(src);
+  });
+
+  return promise;
+};
+
+const safeLoadImage = async (src: string | null | undefined, label = "รูปภาพ") => {
+  if (!src) return null;
+  try {
+    return await loadImage(src, label);
+  } catch (error) {
+    console.warn("Image skipped during export:", src, error);
+    return null;
+  }
+};
+
+const loadCouponFonts = async () => {
+  if (!("fonts" in document)) return;
+  if (!couponFontsReadyPromise) {
+    couponFontsReadyPromise = Promise.all([
+      document.fonts.load('400 32px "DB Airy"'),
+      document.fonts.load('600 32px "DB Airy"'),
+      document.fonts.load('700 32px "DB Airy"'),
+      document.fonts.ready,
+    ])
+      .then(() => undefined)
+      .catch((error) => {
+        couponFontsReadyPromise = null;
+        console.warn("Font loading skipped:", error);
+      });
+  }
+  await couponFontsReadyPromise;
+};
+
 const getLogoFrameDimensions = (ratio: TemplateSelection["logoAspectRatio"]) => {
   const [widthUnit, heightUnit] = ratio.split(":").map(Number);
   if (widthUnit >= heightUnit) {
@@ -191,6 +245,9 @@ export const CouponPreview = ({
 }: CouponPreviewProps) => {
   const artworkRef = useRef<HTMLDivElement | null>(null);
   const previewCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const offscreenCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const renderGenerationRef = useRef(0);
+  const renderFrameRef = useRef<number | null>(null);
   const contentBoxRef = useRef<HTMLDivElement | null>(null);
   const logoInputRef = useRef<HTMLInputElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -376,28 +433,6 @@ export const CouponPreview = ({
           : line.text,
   }));
 
-  const loadImage = (src: string, label = "รูปภาพ") =>
-    new Promise<HTMLImageElement>((resolve, reject) => {
-      const image = new Image();
-      image.decoding = "async";
-      if (!src.startsWith("blob:") && !src.startsWith("data:")) {
-        image.crossOrigin = "anonymous";
-      }
-      image.onload = () => resolve(image);
-      image.onerror = () => reject(new Error(`ไม่สามารถโหลด${label}สำหรับ export ได้`));
-      image.src = src;
-    });
-
-  const safeLoadImage = async (src: string | null | undefined, label = "รูปภาพ") => {
-    if (!src) return null;
-    try {
-      return await loadImage(src, label);
-    } catch (error) {
-      console.warn("Image skipped during export:", src, error);
-      return null;
-    }
-  };
-
   useEffect(() => {
     if (!uploadedImageUrl) {
       setImageNaturalSize(null);
@@ -476,20 +511,6 @@ export const CouponPreview = ({
     if (dragStateRef.current?.pointerId === event.pointerId) {
       dragStateRef.current = null;
       event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-  };
-
-  const loadCouponFonts = async () => {
-    if (!("fonts" in document)) return;
-    try {
-      await Promise.all([
-        document.fonts.load('400 32px "DB Airy"'),
-        document.fonts.load('600 32px "DB Airy"'),
-        document.fonts.load('700 32px "DB Airy"'),
-        document.fonts.ready,
-      ]);
-    } catch (error) {
-      console.warn("Font loading skipped:", error);
     }
   };
 
@@ -747,36 +768,70 @@ export const CouponPreview = ({
   };
 
   useLayoutEffect(() => {
+    const generation = ++renderGenerationRef.current;
     let cancelled = false;
 
-    const renderPreview = async () => {
-      await loadCouponFonts();
-      const canvas = previewCanvasRef.current;
-      const measureRoot = artworkRef.current;
-      if (!canvas || !measureRoot || cancelled) return;
+    if (renderFrameRef.current !== null) {
+      cancelAnimationFrame(renderFrameRef.current);
+    }
 
-      const bounds = measureRoot.getBoundingClientRect();
-      if (bounds.width < 1) return;
+    renderFrameRef.current = requestAnimationFrame(() => {
+      renderFrameRef.current = null;
+      if (cancelled || generation !== renderGenerationRef.current) return;
 
-      const context = canvas.getContext("2d");
-      if (!context) return;
+      void (async () => {
+        await loadCouponFonts();
+        if (cancelled || generation !== renderGenerationRef.current) return;
 
-      canvas.width = canvasSize;
-      canvas.height = canvasSize;
-      context.imageSmoothingEnabled = true;
-      context.imageSmoothingQuality = "high";
+        const canvas = previewCanvasRef.current;
+        const measureRoot = artworkRef.current;
+        if (!canvas || !measureRoot) return;
 
-      try {
-        await paintCouponToCanvas(context);
-      } catch (error) {
-        console.error("Preview render failed:", error);
-      }
-    };
+        const bounds = measureRoot.getBoundingClientRect();
+        if (bounds.width < 1) return;
 
-    renderPreview();
+        if (!offscreenCanvasRef.current) {
+          offscreenCanvasRef.current = document.createElement("canvas");
+        }
+        const offscreenCanvas = offscreenCanvasRef.current;
+
+        if (offscreenCanvas.width !== canvasSize || offscreenCanvas.height !== canvasSize) {
+          offscreenCanvas.width = canvasSize;
+          offscreenCanvas.height = canvasSize;
+        }
+        if (canvas.width !== canvasSize || canvas.height !== canvasSize) {
+          canvas.width = canvasSize;
+          canvas.height = canvasSize;
+        }
+
+        const offscreenContext = offscreenCanvas.getContext("2d");
+        const visibleContext = canvas.getContext("2d");
+        if (!offscreenContext || !visibleContext) return;
+
+        offscreenContext.imageSmoothingEnabled = true;
+        offscreenContext.imageSmoothingQuality = "high";
+        visibleContext.imageSmoothingEnabled = true;
+        visibleContext.imageSmoothingQuality = "high";
+
+        try {
+          await paintCouponToCanvas(offscreenContext);
+        } catch (error) {
+          console.error("Preview render failed:", error);
+          return;
+        }
+
+        if (cancelled || generation !== renderGenerationRef.current) return;
+
+        visibleContext.drawImage(offscreenCanvas, 0, 0);
+      })();
+    });
 
     return () => {
       cancelled = true;
+      if (renderFrameRef.current !== null) {
+        cancelAnimationFrame(renderFrameRef.current);
+        renderFrameRef.current = null;
+      }
     };
   }, [
     selection,
@@ -797,7 +852,6 @@ export const CouponPreview = ({
     isRedTierTheme,
     isBlueTierTheme,
     isBlackTierTheme,
-    renderedTypeLines,
     template.expectedLineCount,
     template.contentLayout.id,
   ]);
