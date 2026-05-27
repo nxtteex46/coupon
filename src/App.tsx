@@ -13,6 +13,15 @@ const readFileAsDataUrl = (file: File) =>
     reader.onerror = () => reject(new Error("ไม่สามารถอ่านไฟล์รูปภาพได้"));
     reader.readAsDataURL(file);
   });
+
+const preloadImage = (src: string) =>
+  new Promise<void>((resolve, reject) => {
+    const image = new Image();
+    image.decoding = "async";
+    image.onload = () => resolve();
+    image.onerror = () => reject(new Error("ไม่สามารถโหลดตัวอย่างรูปภาพได้"));
+    image.src = src;
+  });
 type AppTab = "validator" | "mobile-preview" | "download-asset" | "contact";
 const COUPON_CANVAS_WIDTH = 1040;
 const CONTENT_WIDTH_RATIO = 0.61;
@@ -122,24 +131,27 @@ function App() {
   };
 
   const handleFileSelect = async (nextFile: File) => {
-    setFile(nextFile);
     try {
       const nextPreview = await readFileAsDataUrl(nextFile);
+      setFile(nextFile);
       setImagePreview(nextPreview);
     } catch (error) {
       console.error(error);
+      setFile(null);
       setImagePreview(null);
       window.alert("ไม่สามารถอ่านไฟล์รูปคูปองได้");
     }
   };
 
   const handleLogoSelect = async (nextFile: File) => {
-    setLogoFile(nextFile);
     try {
       const nextPreview = await readFileAsDataUrl(nextFile);
+      await preloadImage(nextPreview);
+      setLogoFile(nextFile);
       setLogoPreview(nextPreview);
     } catch (error) {
       console.error(error);
+      setLogoFile(null);
       setLogoPreview(null);
       window.alert("ไม่สามารถอ่านไฟล์โลโก้ได้");
     }

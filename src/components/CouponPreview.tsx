@@ -932,24 +932,23 @@ export const CouponPreview = ({
       </div>
 
       <div className="mt-3 flex flex-col gap-3 rounded-xl border border-ink/8 bg-sand/25 p-3 sm:flex-row sm:items-center">
-        {uploadedLogoUrl ? (
-          <div
-            className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-ink/10 bg-white sm:h-12 sm:w-12"
-            style={{ aspectRatio: selection.logoAspectRatio.replace(":", " / ") }}
-          >
-            <img src={uploadedLogoUrl} alt="" className="h-full w-full object-contain" />
-          </div>
-        ) : (
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-dashed border-ink/15 bg-white text-[11px] font-medium text-ink/40">
-            โลโก้
-          </div>
-        )}
+        <div
+          className={`flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white ${
+            uploadedLogoUrl ? "border border-ink/10" : "border border-dashed border-ink/15"
+          }`}
+        >
+          {uploadedLogoUrl ? (
+            <img src={uploadedLogoUrl} alt="" className="h-full w-full object-contain" decoding="async" />
+          ) : (
+            <span className="text-[11px] font-medium text-ink/40">โลโก้</span>
+          )}
+        </div>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-ink">โลโก้มุมขวาบน</p>
           <p className="text-xs text-ink/50">ไม่บังคับ — แสดงบนพื้นที่รูปด้านบน</p>
         </div>
-        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
-          <div className="w-[88px]">
+        <div className="flex w-full shrink-0 flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
+          <div className="w-[88px] shrink-0">
             <CustomSelect
               value={selection.logoAspectRatio}
               options={LOGO_ASPECT_OPTIONS.map((option) => ({
@@ -972,19 +971,21 @@ export const CouponPreview = ({
           <button
             type="button"
             onClick={() => logoInputRef.current?.click()}
-            className="rounded-full border border-ink/12 bg-white px-3.5 py-1.5 text-xs font-semibold text-ink transition hover:border-ink"
+            className="min-w-[72px] rounded-full border border-ink/12 bg-white px-3.5 py-1.5 text-center text-xs font-semibold text-ink transition hover:border-ink"
           >
             {uploadedLogoName ? "เปลี่ยน" : "อัปโหลด"}
           </button>
-          {uploadedLogoName ? (
-            <button
-              type="button"
-              onClick={onLogoClear}
-              className="rounded-full px-3 py-1.5 text-xs font-medium text-ink/55 transition hover:text-ink"
-            >
-              ลบ
-            </button>
-          ) : null}
+          <button
+            type="button"
+            onClick={onLogoClear}
+            aria-hidden={!uploadedLogoName}
+            tabIndex={uploadedLogoName ? 0 : -1}
+            className={`min-w-[40px] rounded-full px-3 py-1.5 text-center text-xs font-medium text-ink/55 transition hover:text-ink ${
+              uploadedLogoName ? "" : "invisible pointer-events-none"
+            }`}
+          >
+            ลบ
+          </button>
         </div>
       </div>
 
